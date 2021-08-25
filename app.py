@@ -51,6 +51,8 @@ class ReminderSchema(ma.Schema):
 reminder_schema = ReminderSchema()
 multi_reminder_schema = ReminderSchema(many=True)
 
+
+
 @app.route("/month/add", methods=["POST"])
 def add_month():
     if request.content_type != "application/json":
@@ -72,6 +74,7 @@ def add_month():
     db.session.commit()
 
     return jsonify(month_schema.dump(new_record))
+
 
 @app.route("/month/add/multi", methods=["POST"])
 def add_multi_months():
@@ -99,10 +102,89 @@ def add_multi_months():
 
     return jsonify(multi_month_schema.dump(new_records))
 
+
 @app.route("/month/get", methods=["GET"])
 def get_months():
     all_months = db.session.query(Month).all()
     return jsonify(multi_month_schema.dump(all_months))
+
+
+
+
+@app.route("/reminder/add", methods=["POST"])
+def add_reminder():
+    if request.content_type != "application/json":
+        return jsonify("Error: Please send data as JSON")
+
+    post_data = request.get_json()
+    text = post_data.get("text")
+    date = post_data.get("date")
+    month_id = post_data.get("month_id")
+
+    existing_reminder_check = db.session.query(Reminder).filter(Reminder.date == date).filter(Reminder.month_id == month_id).first()
+    if existing_reminder_check is not None:
+        return jsonify("Error: Reminder already exists")
+
+    new_record = Reminder(text, date, month_id)
+    db.session.add(new_record)
+    db.session.commit()
+
+    return jsonify(reminder_schema.dump(new_record))
+
+
+@app.route("/reminder/get", methods=["GET"])
+def get_reminders():
+    all_reminders = db.session.query(Reminder).all()
+    return jsonify(multi_reminder_schema.dump(all_reminders))
+
+
+@app.route("/reminder/get/week/<month_id>/<dates>", methods=["GET"])
+def get_reminders_by_week(month_id, dates):
+    all_reminders = []
+    for date in dates.split("-"):
+        reminder = db.session.query(Reminder).filter(Reminder.month_id == month_id).filter(Reminder.date == date).first()
+        all_reminders.append(reminder)
+    return jsonify(multi_reminder_schema.dump(all_reminders))
+
+
+@app.route("/reminder/get/<month_id>/<date>", methods=["GET"])
+def get_reminder(month_id, date):
+    reminder = db.session.query(Reminder).filter(Reminder.month_id == month_id).filter(Reminder.date == date).first()
+    return jsonify(reminder_schema.dump(reminder))
+
+
+@app.route("/reminder/update/<month_id>/<date>", methods=["PUT"])
+def update_reminder(month_id, date):
+    if request.content_type != "application/json":
+        return jsonify("Error: Please send data as JSON")
+
+    put_data = request.get_json()
+    text = put_data.get("text")
+
+    reminder = db.session.query(Reminder).filter(Reminder.month_id == month_id).filter(Reminder.date == date).first()
+
+    reminder.text = text
+    db.session.commit()
+
+    return jsonify(reminder_schema.dump(reminder))
+
+
+@app.route("/reminder/delete/<month_id>/<date>", methods=["DELETE"])
+def delete_reminder(month_id, date):
+    reminder = db.session.query(Reminder).filter(Reminder.month_id == month_id).filter(Reminder.date == date).first()
+    db.session.delete(reminder)
+
+    db.session.commit()
+
+    return jsonify(reminder_schema.dump(reminder))
+
+
+
+
+
+
+
+
 
 if __name__ == "__main__":
     app.run(debug=True)
